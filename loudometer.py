@@ -27,6 +27,8 @@ import audioop
 
 log.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%H:%M:%S', level=log.INFO)
 
+
+
 def generate_config():
 	with open('config.json', 'w') as f:
 		json.dump({
@@ -41,6 +43,10 @@ def load_config():
 	with open('config.json', 'r') as f:
 		return json.load(f)
 	log.info('Configuration (re)loaded')
+
+
+
+
 
 if not os.path.exists('config.json'):
 	log.info('Generating configuration file... ')
@@ -70,20 +76,22 @@ CHANNELS = 1 if sys.platform == 'darwin' else 2
 RATE = 44100
 
 p = pyaudio.PyAudio()
-
 stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, input_device_index=index)
 
 log.info('Starting to listen!')
+
 largest = 0
 ticker = time.time()
 last_request_sent = 0
 
 config_poll = time.time()
 config_age = os.stat('config.json').st_mtime
+
 while 1:
 	data = stream.read(CHUNK)
 	volume = audioop.rms(data,2)
 	
+	# check for changes in the config file, and load them
 	if time.time() > config_poll + 1:
 		config_poll = time.time()
 		mtime = os.stat('config.json').st_mtime
@@ -92,6 +100,7 @@ while 1:
 			config = load_config()
 			log.info('Reloaded configuration.')
 	
+	# printing of the recorded volume
 	if config['print_volume_every_second']:
 		largest = max(volume, largest)
 		if time.time() > ticker + 1:
@@ -105,7 +114,7 @@ while 1:
 		# requests.get(target)
 		threading.Thread(target=requests.get, args=(target,)).start()
 		last_request_sent = time.time()
-	
+
 print('Done')
 
 stream.close()

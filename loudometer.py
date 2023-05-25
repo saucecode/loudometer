@@ -93,7 +93,7 @@ except:
 FORMAT = pyaudio.paInt16
 CHANNELS = device_data[index]['maxInputChannels']
 CHUNK = 1024
-RATE = 44100
+RATE = int(device_data[index]['defaultSampleRate'])
 
 p = pyaudio.PyAudio()
 stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, input_device_index=index)

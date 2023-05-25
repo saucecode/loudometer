@@ -27,6 +27,11 @@ import logging as log
 import pyaudio
 import audioop
 
+__version__ = 'loudometer/0.2.0.0'
+CONFIG_VERSION = 200
+
+print(__version__, CONFIG_VERSION)
+
 log.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%H:%M:%S', level=log.INFO)
 
 
@@ -37,7 +42,8 @@ def generate_config():
 			'print_volume_every_second': True,
 			'volume_trigger_threshold': 1000,
 			'minimum_time_between_triggers_in_seconds': 10,
-			"active": True
+			"active": True,
+			'version': CONFIG_VERSION
 		}
 		for i in range(32):
 			template[f'http_target_channel{i}'] = ''
@@ -57,9 +63,16 @@ if not os.path.exists('config.json'):
 	log.info('Generating configuration file... ')
 	generate_config()
 	log.info('Done. This program will now exit. Start the program again when you have entered your values.')
+	input('Press enter to close...')
 	sys.exit(0)
 
 config = load_config()
+
+if (detected_version := config.get('version', 0)) != CONFIG_VERSION:
+	log.warning(f'Configuration file may be out of date! Detected version: {detected_version}. Current version: {CONFIG_VERSION}.')
+	log.warning('Please backup your config (optional) and delete the config file. It will be regenerated on the next run.')
+	input('Press enter to close...')
+	sys.exit(0)
 
 p = pyaudio.PyAudio()
 info = p.get_host_api_info_by_index(0)

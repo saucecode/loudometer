@@ -27,7 +27,7 @@ import logging as log
 import pyaudio
 import audioop
 
-__version__ = 'loudometer/0.2.0.0'
+__version__ = 'loudometer/0.2.1'
 CONFIG_VERSION = 200
 
 print(__version__, CONFIG_VERSION)

@@ -61,8 +61,8 @@ info = p.get_host_api_info_by_index(0)
 numdevices = info.get('deviceCount')
 
 for i in range(numdevices):
-	if (p.get_device_info_by_host_api_device_index(0, i).get('maxInputChannels')) >= 0:
-		print("Input Device id ", i, " - ", p.get_device_info_by_host_api_device_index(0, i).get('name'))
+	if (device_info := p.get_device_info_by_host_api_device_index(0, i)).get('maxInputChannels') >= 0:
+		print("Device ID ", i, " - ", device_info.get('name'), '(has',device_info.get('maxInputChannels', 'ERROR'),'channels)')
 
 try:
 	index = int(input('Enter the device ID number to listen to: '))

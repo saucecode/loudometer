@@ -28,7 +28,7 @@ import pyaudio
 import audioop
 
 __version__ = 'loudometer/0.2.1'
-CONFIG_VERSION = 200
+CONFIG_VERSION = 220
 
 print(__version__, CONFIG_VERSION)
 
@@ -43,7 +43,8 @@ def generate_config():
 			'volume_trigger_threshold': 1000,
 			'minimum_time_between_triggers_in_seconds': 10,
 			"active": True,
-			'version': CONFIG_VERSION
+			'version': CONFIG_VERSION,
+			'input_device_name': ''
 		}
 		for i in range(32):
 			template[f'http_target_channel{i}'] = ''
@@ -84,11 +85,35 @@ for i in range(numdevices):
 		device_data[i] = device_info
 		print("Device ID ", i, " - ", device_info.get('name'), '(has',device_info.get('maxInputChannels', 'ERROR'),'channels)')
 
-try:
-	index = int(input('Enter the device ID number to listen to: '))
-except:
-	log.info('Failed!')
-	sys.exit(1)
+if not config.get('input_device_name'):
+	try:
+		print('No default device has been set in the config (input_device_name).')
+		index = int(input('Enter the device ID number to listen to: '))
+	except:
+		log.info('Failed!')
+		sys.exit(1)
+		
+else:
+	# search for the device with the name
+	candidate_indices = [idx for idx, device_info in device_data.items() if device_info.get('name').startswith(config.get('input_device_name'))]
+	
+	match len(candidate_indices):
+		case 0:
+			log.error(f'Could not find a device named {config.get("input_device_name")}! Please update your configuration.')
+			input('Press enter to close...')
+			sys.exit(0)
+		
+		case 1:
+			log.info(f'{config.get("input_device_name")} was found!')
+			index = candidate_indices[0]
+			
+		case _:
+			log.warning(f'Found multiple devices that start with {config.get("input_device_name")}:')
+			for idx in candidate_indices:
+				log.warning(f' - ({idx}) ' + device_data[idx].get('name'))
+			log.warning('Please update your configuration with a more specific name.')
+			input('Press enter to close...')
+			sys.exit(0)
 
 FORMAT = pyaudio.paInt16
 CHANNELS = device_data[index]['maxInputChannels']
@@ -100,6 +125,8 @@ stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, input_d
 
 log.info(f'Starting to listen on {CHANNELS} channels')
 
+
+# stately variables for the main loop
 largest = [0] * CHANNELS
 ticker = time.time()
 last_request_sent = [0] * CHANNELS
@@ -143,6 +170,7 @@ while 1:
 			log.info(f'Highest Volume per channel in the past second: {" ".join(str(i) for i in largest)}')
 			largest = [0] * CHANNELS
 	
+	# volume triggers
 	for channel, volume in enumerate(volumes):
 		if volume > config['volume_trigger_threshold'] \
 		and time.time() > last_request_sent[channel] + config['minimum_time_between_triggers_in_seconds'] \

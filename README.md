@@ -18,6 +18,12 @@ To test if PyAudio is working and installed correctly, and to see a list of avai
 
 Further instructions and tips are available in `instructions.txt`.
 
+# UDP Commands
+
+Commands can be sent to this program via UDP. The default port is `36591`. This feature can be disabled by setting `udp_commands` to false.
+
+There are currently only two commands. `ARM` and `DISARM`, which will arm and disarm all loudness triggers. Instructions for setting this in Bitfocus Companion have been added to `instructions.txt`.
+
 # License
 
 GPL-3.0. See LICENSE.

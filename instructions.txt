@@ -1,4 +1,5 @@
 # loudometer
+version 0.2.2
 
 loudometer performs a simple task: It will listen to a nominated audio input device, and if the volume detected reaches a configurable threshold, it will fire a HTTP request. All configuration is in the file `config.json`. This file is generated the first time you run the script `loudometer.py`.
 
@@ -99,3 +100,17 @@ Under normal operation, loudometer output should look something like this:
 	...
 
 To force stop the script, press Ctrl+C.
+
+
+# Sending UDP Commands from Bitfocus Companion
+
+UDP stands for User-Datagram Protocol. It is a very low level high speed networking protocol, commonly used for real time multiplayer video games, video and voice (VoIP) calling, and in Bittorrent. It is very easy to set up and use, and Bitfocus Companion happens to have it as a connection.
+
+Under the Connections tab, add the `Generic TCP and UDP Requests` or `tcp-udp` connection. Set the target IP to 127.0.0.1 and the target port to 36591 (this can be changed in the config file). Make sure to select "Connect with UDP". Hit save, and you can ignore the "Connecting..." status that appears.
+
+You can now add an action called `tcp-udp: Send Command` to a button. Just enter the word "ARM" as the command for the on button, and "DISARM" as the command for the off button. The "Command End Character" should default to "LF - \n".
+
+So while loudometer is running, it will print out messages like this when it receives one of those commands,
+
+19:31:13 INFO Received ARM command from ('127.0.0.1', 58547)
+19:31:16 INFO Received DISARM command from ('127.0.0.1', 58547)

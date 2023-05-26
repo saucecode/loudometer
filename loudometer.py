@@ -27,14 +27,14 @@ import logging as log
 import pyaudio
 import audioop
 
-__version__ = 'loudometer/0.2.1'
+__version__ = 'loudometer/0.2.2'
 CONFIG_VERSION = 220
 
 print(__version__, CONFIG_VERSION)
 
 log.basicConfig(format='%(asctime)s %(levelname)s %(message)s', datefmt='%H:%M:%S', level=log.INFO)
 
-
+import socket, select
 
 def generate_config():
 	with open('config.json', 'w') as f:
@@ -44,6 +44,8 @@ def generate_config():
 			'minimum_time_between_triggers_in_seconds': 10,
 			"active": True,
 			'version': CONFIG_VERSION,
+			'udp_commands': True,
+			'udp_commands_port': 36591,
 			'input_device_name': ''
 		}
 		for i in range(32):
@@ -125,7 +127,6 @@ stream = p.open(format=FORMAT, channels=CHANNELS, rate=RATE, input=True, input_d
 
 log.info(f'Starting to listen on {CHANNELS} channels')
 
-
 # stately variables for the main loop
 largest = [0] * CHANNELS
 ticker = time.time()
@@ -133,6 +134,17 @@ last_request_sent = [0] * CHANNELS
 
 config_poll = time.time()
 config_age = os.stat('config.json').st_mtime
+
+# prepare the UDP socket (if configured)
+sock = None
+
+if config.get('udp_commands'):
+	log.info(f'Starting UDP socket on port {config.get("udp_commands_port")} [UDP_commands = true]')
+
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR,1)
+	sock.bind(('127.0.0.1', config.get("udp_commands_port")))
+	sock.setblocking(False)
 
 while 1:
 	raw = stream.read(CHUNK)
@@ -181,6 +193,16 @@ while 1:
 			# requests.get(target)
 			threading.Thread(target=requests.get, args=(target,)).start()
 			last_request_sent[channel] = time.time()
+	
+	if config.get('udp_commands') and sock and select.select([sock], [], [], 0)[0]:
+		command, address = sock.recvfrom(64)
+		if command:
+			if command == b'DISARM\n':
+				log.info(f'Received DISARM command from {address}')
+				config['active'] = False
+			if command == b'ARM\n':
+				log.info(f'Received ARM command from {address}')
+				config['active'] = True
 
 print('Done')
 

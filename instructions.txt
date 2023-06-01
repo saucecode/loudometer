@@ -1,7 +1,7 @@
 # loudometer
-version 0.2.2
+version 0.2.3
 
-loudometer performs a simple task: It will listen to a nominated audio input device, and if the volume detected reaches a configurable threshold, it will fire a HTTP request. All configuration is in the file `config.json`. This file is generated the first time you run the script `loudometer.py`.
+loudometer performs a simple task: It will listen to all channels of a nominated audio input device, and if the volume(s) detected reaches a configurable threshold, it will fire a HTTP request. All configuration is in the file `config.json`. This file is generated the first time you run the script `loudometer.py`.
 
 
 The HTTP request to push a button in Bitfocus Companion can be found at the bottom of the "Edit Button" menu in Companion. It will say something like:
@@ -22,9 +22,7 @@ To put the script into a standby mode, set `active` to False. The script will ke
 
 `print_volume_every_second` will print the peak volume level second by second. Good for tuning the `volume_trigger_threshold` value.
 
-`volume_trigger_threshold` is the value at which the script will send a HTTP request. It is calculated as the RMS of the audio stream.
-
-`minimum_time_between_triggers_in_seconds` is what it says. The script will not send a HTTP request if a request was already sent in the recent past.
+`minimum_time_between_triggers_milliseconds` is what it says. The script will not send a HTTP request if a request was already sent in the recent past.
 
 
 
@@ -118,16 +116,18 @@ So while loudometer is running, it will print out messages like this when it rec
 
 # New Triggers Format
 
+This format now replaces the previously universal 'volume_threshold' config option.
+
 		{
             "name": "camera one",
             "http_target": "http://127.0.0.1:8888/press/bank/1/2",
             "channels": [
-                3
+                0
             ],
-            "channel_thresholds": [
-                1000
+            "channel_volume_thresholds": [
+                300
             ],
-            "delay_ms": 500,
+            "delay_ms": 2000,
             "priority": 1
         },
         {
@@ -136,7 +136,7 @@ So while loudometer is running, it will print out messages like this when it rec
             "channels": [
                 5
             ],
-            "channel_thresholds": [
+            "channel_volume_thresholds": [
                 1500
             ],
             "delay_ms": 500,
@@ -147,11 +147,11 @@ So while loudometer is running, it will print out messages like this when it rec
             "http_target": "http://127.0.0.1:8888/press/bank/3/2",
             "channels": [
                 3,
-                5
+                4
             ],
-            "channel_thresholds": [
-                1000,
-                1500
+            "channel_volume_thresholds": [
+                300,
+                400
             ],
             "delay_ms": 200,
             "priority": 5

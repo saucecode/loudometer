@@ -42,8 +42,7 @@ def generate_config():
 	with open('config.json', 'w') as f:
 		template = {
 			'print_volume_every_second': True,
-			'volume_trigger_threshold': 1000,
-			'minimum_time_between_triggers_in_seconds': 10,
+			'minimum_time_between_triggers_milliseconds': 10000,
 			'accumulator_size': 2,
 			"active": True,
 			'version': CONFIG_VERSION,
@@ -228,7 +227,7 @@ while 1:
 		if all(
 			volume_accumulators[channel].average() > threshold for channel, threshold \
 			in zip(trigger['channels'], trigger['channel_volume_thresholds'])
-		) and time.time() > last_request_sent + config['minimum_time_between_triggers_in_seconds'] \
+		) and time.time() > last_request_sent + config['minimum_time_between_triggers_milliseconds']/1000 \
 		and config['active']:
 		
 			if trigger['priority'] > armed_trigger['priority']:

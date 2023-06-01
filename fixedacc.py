@@ -45,7 +45,11 @@ if __name__ == "__main__":
 	
 	for i in range(10):
 		a.push(i)
-	
 	assert a.average() == 4.5
+	
+	for i in range(10):
+		a.push(0)
+	
+	assert a.average() == 0.0
 	
 	print('Tests pass!')

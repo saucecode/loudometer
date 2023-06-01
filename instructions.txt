@@ -114,3 +114,63 @@ So while loudometer is running, it will print out messages like this when it rec
 
 19:31:13 INFO Received ARM command from ('127.0.0.1', 58547)
 19:31:16 INFO Received DISARM command from ('127.0.0.1', 58547)
+
+
+# New Triggers Format
+
+		{
+            "name": "camera one",
+            "http_target": "http://127.0.0.1:8888/press/bank/1/2",
+            "channels": [
+                3
+            ],
+            "channel_thresholds": [
+                1000
+            ],
+            "delay_ms": 500,
+            "priority": 1
+        },
+        {
+            "name": "camera two",
+            "http_target": "http://127.0.0.1:8888/press/bank/2/2",
+            "channels": [
+                5
+            ],
+            "channel_thresholds": [
+                1500
+            ],
+            "delay_ms": 500,
+            "priority": 1
+        },
+        {
+            "name": "wide shot",
+            "http_target": "http://127.0.0.1:8888/press/bank/3/2",
+            "channels": [
+                3,
+                5
+            ],
+            "channel_thresholds": [
+                1000,
+                1500
+            ],
+            "delay_ms": 200,
+            "priority": 5
+        }
+
+This is a set of three triggers.
+Each trigger has: a `name`; a `http_target`; a list of `channels`; a list of `channel_volume_thresholds`; a delay in milliseconds; a priority.
+
+Internally, a trigger has these states:
+Listening, Armed, Actioned.
+loudometer will only allow one trigger to be armed at any time.
+An armed trigger can be replaced by the arming of another trigger with a higher `priority` value.
+When an armed trigger reaches the end of its delay_ms period, it will be actioned, and then disarmed.
+
+The name is just there to help you keep track of which one is which.
+The http_target is the web URL to request when the trigger is actioned.
+
+`channels` is a list of all the channels that must be hot to activate this trigger.
+`channel_volume_thresholds` is a list of the volume thresholds that each channel must meet to be considered hot. There must be one value in this list for every value in the `channels` list.
+
+`delay_ms` is the milliseconds to wait between the trigger being armed and the trigger being actioned.
+If at the end of delay the trigger is still armed, it will fire.

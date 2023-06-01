@@ -27,8 +27,10 @@ import logging as log
 import pyaudio
 import audioop
 
-__version__ = 'loudometer/0.2.2'
-CONFIG_VERSION = 220
+from fixedacc import fixedaccumulator
+
+__version__ = 'loudometer/0.2.3'
+CONFIG_VERSION = 231
 
 print(__version__, CONFIG_VERSION)
 
@@ -42,15 +44,39 @@ def generate_config():
 			'print_volume_every_second': True,
 			'volume_trigger_threshold': 1000,
 			'minimum_time_between_triggers_in_seconds': 10,
+			'accumulator_size': 2,
 			"active": True,
 			'version': CONFIG_VERSION,
 			'udp_commands': True,
 			'udp_commands_port': 36591,
-			'input_device_name': ''
+			'input_device_name': '',
+			'triggers': [
+				{
+					'name': 'camera one',
+					'http_target': 'http://127.0.0.1:8888/press/bank/1/2',
+					'channels': [3],
+					'channel_volume_thresholds': [300],
+					'delay_ms': 500,
+					'priority': 1
+				},
+				{
+					'name': 'camera two',
+					'http_target': 'http://127.0.0.1:8888/press/bank/2/2',
+					'channels': [5],
+					'channel_volume_thresholds': [400],
+					'delay_ms': 500,
+					'priority': 1
+				},
+				{
+					'name': 'wide shot',
+					'http_target': 'http://127.0.0.1:8888/press/bank/3/2',
+					'channels': [3, 5],
+					'channel_volume_thresholds': [300, 400],
+					'delay_ms': 200,
+					'priority': 5
+				}
+			]
 		}
-		for i in range(32):
-			template[f'http_target_channel{i}'] = ''
-		template['http_target_channel0'] = 'http://127.0.0.1:8888/press/bank/1/2'
 		json.dump(template, f, indent=4)
 
 def load_config():
@@ -130,7 +156,19 @@ log.info(f'Starting to listen on {CHANNELS} channels')
 # stately variables for the main loop
 largest = [0] * CHANNELS
 ticker = time.time()
-last_request_sent = [0] * CHANNELS
+last_request_sent = 0
+volume_accumulators = [fixedaccumulator(config['accumulator_size'] * RATE // CHUNK) for _ in range(CHANNELS)]
+armed_trigger = {
+	'priority': -1,
+	'target': None,
+	'expires_at': 0,
+	'name': None
+}
+
+# filter out triggers for non-existent channels
+log.info(f'Triggers listed in config: {len(config["triggers"])}.')
+config['triggers'] = [trigger for trigger in config['triggers'] if all(chan < CHANNELS for chan in trigger['channels'])]
+log.info(f'Triggers available with this audio source: {len(config["triggers"])}.')
 
 config_poll = time.time()
 config_age = os.stat('config.json').st_mtime
@@ -162,8 +200,9 @@ while 1:
 		next(channels_selector).write(short)
 	
 	# calculates the volume per channel
-	volumes = [audioop.rms(data.getvalue(), 2) for data in channels]
-	volume = volumes[0]
+	for accumulator, data in zip(volume_accumulators, channels):
+		accumulator.push(audioop.rms(data.getvalue(), 2))
+	#volumes = [audioop.rms(data.getvalue(), 2) for data in channels]
 	
 	# check for changes in the config file, and load them
 	if time.time() > config_poll + 1:
@@ -173,27 +212,50 @@ while 1:
 			config_age = mtime
 			config = load_config()
 			log.info('Reloaded configuration.')
+			# filter out triggers for non-existent channels
+			log.info(f'Triggers listed in config: {len(config["triggers"])}.')
+			config['triggers'] = [trigger for trigger in config['triggers'] if all(chan < CHANNELS for chan in trigger['channels'])]
+			log.info(f'Triggers available with this audio source: {len(config["triggers"])}.')
 	
 	# printing of the recorded volume
 	if config['print_volume_every_second']:
-		largest = [max(volume, largest[channel]) for channel, volume in enumerate(volumes)]
 		if time.time() > ticker + 1:
 			ticker = time.time()
-			log.info(f'Highest Volume per channel in the past second: {" ".join(str(i) for i in largest)}')
-			largest = [0] * CHANNELS
+			log.info(f'Accumulated volume per channel in the past second: {" ".join(str(int(i.average())) for i in volume_accumulators)}')
 	
-	# volume triggers
-	for channel, volume in enumerate(volumes):
-		if volume > config['volume_trigger_threshold'] \
-		and time.time() > last_request_sent[channel] + config['minimum_time_between_triggers_in_seconds'] \
-		and config['active'] \
-		and (target := config.get(f'http_target_channel{channel}')):
+	# trigger monitoring
+	for trigger in config['triggers']:
+		if all(
+			volume_accumulators[channel].average() > threshold for channel, threshold \
+			in zip(trigger['channels'], trigger['channel_volume_thresholds'])
+		) and time.time() > last_request_sent + config['minimum_time_between_triggers_in_seconds'] \
+		and config['active']:
+		
+			if trigger['priority'] > armed_trigger['priority']:
+				if armed_trigger['priority'] != -1:
+					log.info(f'Trigger {armed_trigger["name"]} disarmed.')
+				log.info(f'Trigger {trigger["name"]} is loud! Arming for {trigger["delay_ms"]} ms...')
+				armed_trigger['priority'] = trigger['priority']
+				armed_trigger['expires_at'] = time.time() + trigger['delay_ms']/1000
+				armed_trigger['target'] = trigger['http_target']
+				armed_trigger['name'] = trigger['name']
+	
+	# armed trigger
+	if armed_trigger['priority'] != -1:
+		if time.time() > armed_trigger['expires_at']:
+			log.info(f'Sending request to {armed_trigger["target"]}')
 			
-			log.info(f'Channel {channel} is loud! Sending request to {target}')
-			# requests.get(target)
-			threading.Thread(target=requests.get, args=(target,)).start()
-			last_request_sent[channel] = time.time()
+			threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
+			last_request_sent = time.time()
+			
+			armed_trigger = {
+				'priority': -1,
+				'target': None,
+				'expires_at': 0,
+				'name': None
+			}
 	
+	# UDP commands
 	if config.get('udp_commands') and sock and select.select([sock], [], [], 0)[0]:
 		command, address = sock.recvfrom(64)
 		if command:

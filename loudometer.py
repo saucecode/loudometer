@@ -165,6 +165,7 @@ armed_trigger = {
 }
 
 # filter out triggers for non-existent channels
+# TODO these lines are repeated elsewhere!!!
 log.info(f'Triggers listed in config: {len(config["triggers"])}.')
 config['triggers'] = [trigger for trigger in config['triggers'] if all(chan < CHANNELS for chan in trigger['channels'])]
 log.info(f'Triggers available with this audio source: {len(config["triggers"])}.')
@@ -198,10 +199,9 @@ while 1:
 	while short := data.read(2):
 		next(channels_selector).write(short)
 	
-	# calculates the volume per channel
+	# accumulates the calculated volumes per channel
 	for accumulator, data in zip(volume_accumulators, channels):
 		accumulator.push(audioop.rms(data.getvalue(), 2))
-	#volumes = [audioop.rms(data.getvalue(), 2) for data in channels]
 	
 	# check for changes in the config file, and load them
 	if time.time() > config_poll + 1:
@@ -213,6 +213,7 @@ while 1:
 			log.info('Reloaded configuration.')
 			# filter out triggers for non-existent channels
 			log.info(f'Triggers listed in config: {len(config["triggers"])}.')
+			# TODO repeated code!
 			config['triggers'] = [trigger for trigger in config['triggers'] if all(chan < CHANNELS for chan in trigger['channels'])]
 			log.info(f'Triggers available with this audio source: {len(config["triggers"])}.')
 	
@@ -233,7 +234,9 @@ while 1:
 			if trigger['priority'] > armed_trigger['priority']:
 				if armed_trigger['priority'] != -1:
 					log.info(f'Trigger {armed_trigger["name"]} disarmed.')
+				
 				log.info(f'Trigger {trigger["name"]} is loud! Arming for {trigger["delay_ms"]} ms...')
+				
 				armed_trigger['priority'] = trigger['priority']
 				armed_trigger['expires_at'] = time.time() + trigger['delay_ms']/1000
 				armed_trigger['target'] = trigger['http_target']
@@ -247,6 +250,7 @@ while 1:
 			threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
 			last_request_sent = time.time()
 			
+			# reset trigger to unarmed state
 			armed_trigger = {
 				'priority': -1,
 				'target': None,

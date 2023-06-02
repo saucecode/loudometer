@@ -29,7 +29,7 @@ import audioop
 
 from fixedacc import fixedaccumulator
 
-__version__ = 'loudometer/0.2.3'
+__version__ = 'loudometer/0.2.4'
 CONFIG_VERSION = 231
 
 print(__version__, CONFIG_VERSION)
@@ -251,10 +251,15 @@ while 1:
 				armed_trigger['expires_at'] = time.time() + trigger['delay_ms']/1000
 				armed_trigger['target'] = trigger['http_target']
 				armed_trigger['name'] = trigger['name']
+				armed_trigger['thresholds'] = {chan: threshold for chan, threshold in zip(trigger['channels'], trigger['channel_volume_thresholds'])}
 	
 	# armed trigger
 	if armed_trigger['priority'] != -1:
-		if time.time() > armed_trigger['expires_at']:
+		if time.time() > armed_trigger['expires_at'] \
+		and all(
+			volume_accumulators[channel].average() > threshold for channel, threshold \
+			in armed_trigger['thresholds'].items()
+		):
 			log.info(f'Sending request to {armed_trigger["target"]}')
 			
 			threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()

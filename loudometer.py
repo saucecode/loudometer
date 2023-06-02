@@ -112,10 +112,20 @@ for i in range(numdevices):
 		device_data[i] = device_info
 		print("Device ID ", i, " - ", device_info.get('name'), '(has',device_info.get('maxInputChannels', 'ERROR'),'channels)')
 
+
 if not config.get('input_device_name'):
 	try:
 		print('No default device has been set in the config (input_device_name).')
 		index = int(input('Enter the device ID number to listen to: '))
+		
+		assert index < numdevices
+		
+		reset_config = input(f'Would you like to set "{device_data[index]["name"]}" as the configured default? y/N ').lower() == 'y'
+		if reset_config:
+			config['input_device_name'] = device_data[index]['name']
+			with open('config.json', 'w') as f:
+				json.dump(config, f, indent=4)
+		
 	except:
 		log.info('Failed!')
 		sys.exit(1)

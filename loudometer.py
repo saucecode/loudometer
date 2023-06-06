@@ -166,7 +166,7 @@ log.info(f'Starting to listen on {CHANNELS} channels')
 largest = [0] * CHANNELS
 ticker = time.time()
 last_request_sent = 0
-volume_accumulators = [fixedaccumulator(config['accumulator_size'] * RATE // CHUNK) for _ in range(CHANNELS)]
+volume_accumulators = [fixedaccumulator(int(config['accumulator_size'] * RATE // CHUNK)) for _ in range(CHANNELS)]
 volume_current = [0] * CHANNELS
 armed_trigger = {
 	'priority': -1,

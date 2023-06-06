@@ -167,6 +167,7 @@ largest = [0] * CHANNELS
 ticker = time.time()
 last_request_sent = 0
 volume_accumulators = [fixedaccumulator(config['accumulator_size'] * RATE // CHUNK) for _ in range(CHANNELS)]
+volume_current = [0] * CHANNELS
 armed_trigger = {
 	'priority': -1,
 	'target': None,
@@ -210,8 +211,9 @@ while 1:
 		next(channels_selector).write(short)
 	
 	# accumulates the calculated volumes per channel
-	for accumulator, data in zip(volume_accumulators, channels):
-		accumulator.push(audioop.rms(data.getvalue(), 2))
+	for index, (accumulator, data) in enumerate(zip(volume_accumulators, channels)):
+		volume_current[index] = audioop.rms(data.getvalue(), 2)
+		accumulator.push(volume_current[index])
 	
 	# check for changes in the config file, and load them
 	if time.time() > config_poll + 1:

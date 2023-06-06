@@ -29,7 +29,7 @@ import audioop
 
 from fixedacc import fixedaccumulator
 
-__version__ = 'loudometer/0.2.4'
+__version__ = 'loudometer/0.2.5'
 CONFIG_VERSION = 231
 
 print(__version__, CONFIG_VERSION)
@@ -238,8 +238,8 @@ while 1:
 	# trigger monitoring
 	for trigger in config['triggers']:
 		if all(
-			volume_accumulators[channel].average() > threshold for channel, threshold \
-			in zip(trigger['channels'], trigger['channel_volume_thresholds'])
+			volume_accumulators[channel].average() > threshold and volume_current[channel] > threshold \
+			for channel, threshold in zip(trigger['channels'], trigger['channel_volume_thresholds'])
 		) and time.time() > last_request_sent + config['minimum_time_between_triggers_milliseconds']/1000 \
 		and config['active']:
 		
@@ -257,15 +257,19 @@ while 1:
 	
 	# armed trigger
 	if armed_trigger['priority'] != -1:
-		if time.time() > armed_trigger['expires_at'] \
-		and all(
-			volume_accumulators[channel].average() > threshold for channel, threshold \
-			in armed_trigger['thresholds'].items()
-		):
-			log.info(f'Sending request to {armed_trigger["target"]}')
-			
-			threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
-			last_request_sent = time.time()
+		if time.time() > armed_trigger['expires_at']:
+			if all(
+				volume_current[channel] > threshold for channel, threshold \
+				in armed_trigger['thresholds'].items()
+			):
+				log.info(f'Sending request to {armed_trigger["target"]}')
+				
+				# threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
+				last_request_sent = time.time()
+				
+			else:
+				log.info(f'Armed trigger {armed_trigger["name"]} expired without firing (instantaneous volume too low)')
+				log.info('Instant volume: ' + ' '.join(str(int(i)) for i in volume_current))
 			
 			# reset trigger to unarmed state
 			armed_trigger = {

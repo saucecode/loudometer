@@ -27,10 +27,11 @@ import logging as log
 import pyaudio
 import audioop
 
+from collections import defaultdict
 from fixedacc import fixedaccumulator
 
-__version__ = 'loudometer/0.2.5'
-CONFIG_VERSION = 231
+__version__ = 'loudometer/0.2.6'
+CONFIG_VERSION = 260
 
 print(__version__, CONFIG_VERSION)
 
@@ -42,7 +43,6 @@ def generate_config():
 	with open('config.json', 'w') as f:
 		template = {
 			'print_volume_every_second': True,
-			'minimum_time_between_triggers_milliseconds': 10000,
 			'accumulator_size': 2,
 			"active": True,
 			'version': CONFIG_VERSION,
@@ -56,23 +56,26 @@ def generate_config():
 					'channels': [3],
 					'channel_volume_thresholds': [300],
 					'delay_ms': 500,
-					'priority': 1
+					'priority': 1,
+					'trigger_hold_time_ms': 1000
 				},
 				{
 					'name': 'camera two',
 					'http_target': 'http://127.0.0.1:8888/press/bank/2/2',
-					'channels': [5],
+					'channels': [4],
 					'channel_volume_thresholds': [400],
 					'delay_ms': 500,
-					'priority': 1
+					'priority': 1,
+					'trigger_hold_time_ms': 1000
 				},
 				{
 					'name': 'wide shot',
 					'http_target': 'http://127.0.0.1:8888/press/bank/3/2',
-					'channels': [3, 5],
+					'channels': [3, 4],
 					'channel_volume_thresholds': [300, 400],
 					'delay_ms': 200,
-					'priority': 5
+					'priority': 5,
+					'trigger_hold_time_ms': 2000
 				}
 			]
 		}
@@ -165,7 +168,7 @@ log.info(f'Starting to listen on {CHANNELS} channels')
 # stately variables for the main loop
 largest = [0] * CHANNELS
 ticker = time.time()
-last_request_sent = 0
+next_request_after = 0
 volume_accumulators = [fixedaccumulator(int(config['accumulator_size'] * RATE // CHUNK)) for _ in range(CHANNELS)]
 volume_current = [0] * CHANNELS
 armed_trigger = {
@@ -240,7 +243,7 @@ while 1:
 		if all(
 			volume_accumulators[channel].average() > threshold and volume_current[channel] > threshold \
 			for channel, threshold in zip(trigger['channels'], trigger['channel_volume_thresholds'])
-		) and time.time() > last_request_sent + config['minimum_time_between_triggers_milliseconds']/1000 \
+		) and time.time() > next_request_after \
 		and config['active']:
 		
 			if trigger['priority'] > armed_trigger['priority']:
@@ -253,6 +256,7 @@ while 1:
 				armed_trigger['expires_at'] = time.time() + trigger['delay_ms']/1000
 				armed_trigger['target'] = trigger['http_target']
 				armed_trigger['name'] = trigger['name']
+				armed_trigger['trigger_hold_time_ms'] = trigger['trigger_hold_time_ms']
 				armed_trigger['thresholds'] = {chan: threshold for chan, threshold in zip(trigger['channels'], trigger['channel_volume_thresholds'])}
 	
 	# armed trigger
@@ -265,7 +269,7 @@ while 1:
 				log.info(f'Sending request to {armed_trigger["target"]}')
 				
 				threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
-				last_request_sent = time.time()
+				next_request_after = time.time() + armed_trigger['trigger_hold_time_ms']/1000
 				
 			else:
 				log.info(f'Armed trigger {armed_trigger["name"]} expired without firing (instantaneous volume too low)')

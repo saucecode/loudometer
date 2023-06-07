@@ -169,6 +169,7 @@ log.info(f'Starting to listen on {CHANNELS} channels')
 largest = [0] * CHANNELS
 ticker = time.time()
 next_request_after = 0
+last_request_sent_to = ''
 volume_accumulators = [fixedaccumulator(int(config['accumulator_size'] * RATE // CHUNK)) for _ in range(CHANNELS)]
 volume_current = [0] * CHANNELS
 armed_trigger = {
@@ -269,6 +270,7 @@ while 1:
 				log.info(f'Sending request to {armed_trigger["target"]}')
 				
 				threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
+				last_request_sent_to = armed_trigger['target']
 				next_request_after = time.time() + armed_trigger['trigger_hold_time_ms']/1000
 				
 			else:

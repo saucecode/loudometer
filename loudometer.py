@@ -264,7 +264,7 @@ while 1:
 			):
 				log.info(f'Sending request to {armed_trigger["target"]}')
 				
-				# threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
+				threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
 				last_request_sent = time.time()
 				
 			else:

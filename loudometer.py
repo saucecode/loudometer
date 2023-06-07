@@ -42,7 +42,7 @@ import socket, select
 def generate_config():
 	with open('config.json', 'w') as f:
 		template = {
-			'print_volume_every_second': True,
+			'print_volume_every_second': False,
 			'accumulator_size': 2,
 			"active": True,
 			'version': CONFIG_VERSION,
@@ -267,11 +267,12 @@ while 1:
 				volume_current[channel] > threshold for channel, threshold \
 				in armed_trigger['thresholds'].items()
 			):
-				log.info(f'Sending request to {armed_trigger["target"]}')
-				
-				threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
-				last_request_sent_to = armed_trigger['target']
-				next_request_after = time.time() + armed_trigger['trigger_hold_time_ms']/1000
+				if last_request_sent_to != armed_trigger['target']:
+					log.info(f'Sending request to {armed_trigger["target"]}')
+					
+					threading.Thread(target=requests.get, args=(armed_trigger["target"],)).start()
+					last_request_sent_to = armed_trigger['target']
+					next_request_after = time.time() + armed_trigger['trigger_hold_time_ms']/1000
 				
 			else:
 				log.info(f'Armed trigger {armed_trigger["name"]} expired without firing (instantaneous volume too low)')

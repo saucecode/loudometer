@@ -49,6 +49,14 @@ def generate_config():
 			'udp_commands': True,
 			'udp_commands_port': 36591,
 			'input_device_name': '',
+			'default_trigger': {
+				'http_target': 'http://127.0.0.1:8888/press/bank/5/3',
+				'channels': [1,2,3,4],
+				'silence_level': 5,
+				'silence_time_ms': 5000,
+				'delay_ms': 500,
+				'trigger_hold_time_ms': 1000
+			},
 			'triggers': [
 				{
 					'name': 'camera one',
@@ -172,6 +180,7 @@ next_request_after = 0
 last_request_sent_to = ''
 volume_accumulators = [fixedaccumulator(int(config['accumulator_size'] * RATE // CHUNK)) for _ in range(CHANNELS)]
 volume_current = [0] * CHANNELS
+volume_is_silent = [0] * CHANNELS # the last time at which a channel was silent
 armed_trigger = {
 	'priority': -1,
 	'target': None,
@@ -238,6 +247,31 @@ while 1:
 		if time.time() > ticker + 1:
 			ticker = time.time()
 			log.info(f'Accumulated volume per channel in the past second: {" ".join(str(int(i.average())) for i in volume_accumulators)}')
+	
+	
+	# monitor silence for the default trigger
+	current_time = time.time()
+	for channel_index in config['default_trigger']['channels']:
+		if channel_index < CHANNELS and volume_accumulators[channel_index].average() > config['default_trigger']['silence_level']:
+			volume_is_silent[channel_index] = current_time
+
+	# activate the default trigger if silence condition is met
+	if all(
+		current_time - silent_time > config['default_trigger']['silence_time_ms']/1000 \
+		for channel_index, silent_time in enumerate(volume_is_silent) \
+		if channel_index in config['default_trigger']['channels']
+	) and config['active'] \
+	and time.time() > next_request_after and armed_trigger['name'] is None \
+	and last_request_sent_to != config['default_trigger']['http_target']:
+		armed_trigger['priority'] = -1000
+		armed_trigger['name'] = '_default_trigger_'
+		armed_trigger['target'] = config['default_trigger']['http_target']
+		armed_trigger['expires_at'] = config['default_trigger']['delay_ms']/1000 + current_time
+		armed_trigger['trigger_hold_time_ms'] = config['default_trigger']['trigger_hold_time_ms']
+		# negative volume, to disable this threshold check at firing-time
+		armed_trigger['thresholds'] = {chan: -1 for chan in config['default_trigger']['channels']}
+
+		log.info(f'The default trigger has armed for {config["default_trigger"]["delay_ms"]} ms...')
 	
 	# trigger monitoring
 	for trigger in config['triggers']:

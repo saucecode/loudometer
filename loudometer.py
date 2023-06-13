@@ -30,8 +30,8 @@ import audioop
 from collections import defaultdict
 from fixedacc import fixedaccumulator
 
-__version__ = 'loudometer/0.2.6'
-CONFIG_VERSION = 260
+__version__ = 'loudometer/1.0.0'
+CONFIG_VERSION = 1000
 
 print(__version__, CONFIG_VERSION)
 
